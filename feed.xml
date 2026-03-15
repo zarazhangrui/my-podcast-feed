@@ -20,6 +20,18 @@
     <item>
       <title>My Daily Digest — March 15, 2026</title>
       <description>Your personalized podcast for March 15, 2026</description>
+      <pubDate>Sun, 15 Mar 2026 04:25:26 GMT</pubDate>
+      <enclosure url="https://zarazhangrui.github.io/my-podcast-feed/episodes/2026-03-14-212524.mp3"
+                 length="7670847"
+                 type="audio/mpeg"/>
+      <guid isPermaLink="false">https://zarazhangrui.github.io/my-podcast-feed/episodes/2026-03-14-212524.mp3</guid>
+      <itunes:duration>7:59</itunes:duration>
+      <itunes:summary>Your personalized podcast for March 15, 2026</itunes:summary>
+    </item>
+    
+    <item>
+      <title>My Daily Digest — March 15, 2026</title>
+      <description>Your personalized podcast for March 15, 2026</description>
       <pubDate>Sun, 15 Mar 2026 04:10:07 GMT</pubDate>
       <enclosure url="https://zarazhangrui.github.io/my-podcast-feed/episodes/2026-03-14-211002.mp3"
                  length="112892"
