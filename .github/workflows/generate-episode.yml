@@ -1,0 +1,100 @@
+name: Generate Podcast Episode
+
+on:
+  schedule:
+    # Every 3 days at 8am Pacific (3pm UTC)
+    - cron: '0 15 */3 * *'
+  workflow_dispatch:
+    # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout podcast repo
+        uses: actions/checkout@v4
+
+      - name: Checkout skill scripts
+        uses: actions/checkout@v4
+        with:
+          repository: zarazhangrui/my-podcast-feed
+          path: podcast-repo
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install feedparser anthropic openai elevenlabs pydub PyYAML Jinja2 python-dotenv audioop-lts
+
+      - name: Create config and env
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: |
+          # Create data directory structure
+          mkdir -p ~/.claude/personalized-podcast/{logs,scripts_output,episodes}
+
+          # Create .env file
+          echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" > ~/.claude/personalized-podcast/.env
+          echo "ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}" >> ~/.claude/personalized-podcast/.env
+
+          # Create config.yaml
+          cat > ~/.claude/personalized-podcast/config.yaml << 'YAML'
+          show_name: "AI News for Zara"
+          hosts: 2
+          length_minutes: 10
+          tone: "casual and conversational"
+          language: "en"
+
+          sources:
+            rss:
+              - https://www.bensbites.com/feed
+              - https://read.technically.dev/feed
+              - https://www.latent.space/feed
+
+          llm:
+            provider: "anthropic"
+            api_key_env: "ANTHROPIC_API_KEY"
+            model: "claude-sonnet-4-6"
+
+          tts:
+            provider: "elevenlabs"
+            api_key_env: "ELEVENLABS_API_KEY"
+            host_a_voice_id: "CwhRBWXzGAHq8TQ4Fs17"
+            host_b_voice_id: "EXAVITQu4vr4xnSDxMaL"
+
+          publish:
+            github_repo: "zarazhangrui/my-podcast-feed"
+            github_pages_url: "https://zarazhangrui.github.io/my-podcast-feed"
+
+          schedule:
+            frequency: "every 3 days"
+            time: "08:00"
+            timezone: "America/Los_Angeles"
+
+          retention:
+            max_episodes: 30
+          YAML
+
+      - name: Copy skill scripts
+        run: |
+          # Copy scripts and templates from the repo into the expected skill location
+          mkdir -p ~/.claude/skills/personalized-podcast/{scripts,templates}
+          cp scripts/*.py ~/.claude/skills/personalized-podcast/scripts/
+          cp templates/* ~/.claude/skills/personalized-podcast/templates/
+
+      - name: Run podcast pipeline
+        run: python ~/.claude/skills/personalized-podcast/scripts/run_pipeline.py
+
+      - name: Show logs
+        if: always()
+        run: cat ~/.claude/personalized-podcast/logs/*.log 2>/dev/null || echo "No logs"
