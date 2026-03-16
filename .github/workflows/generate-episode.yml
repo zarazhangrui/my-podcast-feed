@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
     # Allows manual trigger from GitHub Actions tab
 
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -15,12 +18,6 @@ jobs:
     steps:
       - name: Checkout podcast repo
         uses: actions/checkout@v4
-
-      - name: Checkout skill scripts
-        uses: actions/checkout@v4
-        with:
-          repository: zarazhangrui/my-podcast-feed
-          path: podcast-repo
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -35,65 +32,152 @@ jobs:
           python -m pip install --upgrade pip
           pip install feedparser anthropic openai elevenlabs pydub PyYAML Jinja2 python-dotenv audioop-lts
 
-      - name: Create config and env
+      - name: Set up pipeline directories and config
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
         run: |
-          # Create data directory structure
           mkdir -p ~/.claude/personalized-podcast/{logs,scripts_output,episodes}
+          mkdir -p ~/.claude/skills/personalized-podcast/{scripts,templates}
 
-          # Create .env file
+          # Copy scripts and templates from repo
+          cp scripts/*.py ~/.claude/skills/personalized-podcast/scripts/
+          cp templates/* ~/.claude/skills/personalized-podcast/templates/
+
+          # Create .env
           echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" > ~/.claude/personalized-podcast/.env
           echo "ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}" >> ~/.claude/personalized-podcast/.env
 
-          # Create config.yaml
+          # Create config.yaml (no leading spaces — heredoc is literal)
           cat > ~/.claude/personalized-podcast/config.yaml << 'YAML'
           show_name: "AI News for Zara"
           hosts: 2
           length_minutes: 10
           tone: "casual and conversational"
           language: "en"
-
           sources:
             rss:
               - https://www.bensbites.com/feed
               - https://read.technically.dev/feed
               - https://www.latent.space/feed
-
           llm:
             provider: "anthropic"
             api_key_env: "ANTHROPIC_API_KEY"
             model: "claude-sonnet-4-6"
-
           tts:
             provider: "elevenlabs"
             api_key_env: "ELEVENLABS_API_KEY"
             host_a_voice_id: "CwhRBWXzGAHq8TQ4Fs17"
             host_b_voice_id: "EXAVITQu4vr4xnSDxMaL"
-
           publish:
             github_repo: "zarazhangrui/my-podcast-feed"
             github_pages_url: "https://zarazhangrui.github.io/my-podcast-feed"
-
-          schedule:
-            frequency: "every 3 days"
-            time: "08:00"
-            timezone: "America/Los_Angeles"
-
           retention:
             max_episodes: 30
           YAML
 
-      - name: Copy skill scripts
+      - name: Run fetch and remix stages
         run: |
-          # Copy scripts and templates from the repo into the expected skill location
-          mkdir -p ~/.claude/skills/personalized-podcast/{scripts,templates}
-          cp scripts/*.py ~/.claude/skills/personalized-podcast/scripts/
-          cp templates/* ~/.claude/skills/personalized-podcast/templates/
+          python ~/.claude/skills/personalized-podcast/scripts/run_pipeline.py --from-stage fetch 2>&1 || true
+          # Check if we got past remix (script file exists)
+          if [ ! -f ~/.claude/personalized-podcast/scripts_output/$(date +%Y-%m-%d).json ]; then
+            echo "No script generated — likely no new articles. Exiting."
+            exit 0
+          fi
 
-      - name: Run podcast pipeline
-        run: python ~/.claude/skills/personalized-podcast/scripts/run_pipeline.py
+      - name: Run speak stage (TTS)
+        run: python ~/.claude/skills/personalized-podcast/scripts/speak.py
+
+      - name: Publish episode to GitHub Pages
+        run: |
+          # Find the generated MP3
+          MP3_FILE=$(ls -t ~/.claude/personalized-podcast/episodes/*.mp3 2>/dev/null | head -1)
+          if [ -z "$MP3_FILE" ]; then
+            echo "No MP3 generated. Exiting."
+            exit 0
+          fi
+
+          MP3_NAME=$(basename "$MP3_FILE")
+          echo "Publishing: $MP3_NAME"
+
+          # Copy MP3 into repo
+          mkdir -p episodes
+          cp "$MP3_FILE" "episodes/$MP3_NAME"
+
+          # Generate feed.xml using Python
+          python - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+          from email.utils import formatdate
+          from pathlib import Path
+          from jinja2 import Template
+          from pydub import AudioSegment
+
+          mp3_files = sorted(Path("episodes").glob("*.mp3"))
+          if not mp3_files:
+              print("No episodes found")
+              exit(0)
+
+          # Load existing episodes list or build from scratch
+          episodes_path = Path("episodes.json")
+          if episodes_path.exists():
+              with open(episodes_path) as f:
+                  episodes = json.load(f)
+          else:
+              episodes = []
+
+          # Check which MP3s are new
+          existing_filenames = {e["filename"] for e in episodes}
+          for mp3 in mp3_files:
+              if mp3.name not in existing_filenames:
+                  audio = AudioSegment.from_mp3(str(mp3))
+                  total_seconds = len(audio) / 1000
+                  minutes = int(total_seconds // 60)
+                  seconds = int(total_seconds % 60)
+                  duration = f"{minutes}:{seconds:02d}"
+
+                  now = datetime.now(timezone.utc)
+                  episodes.append({
+                      "title": f"AI News for Zara — {now.strftime('%B %d, %Y')}",
+                      "description": f"Your personalized podcast for {now.strftime('%B %d, %Y')}",
+                      "pub_date": formatdate(timeval=now.timestamp(), localtime=False, usegmt=True),
+                      "filename": mp3.name,
+                      "file_size": str(mp3.stat().st_size),
+                      "duration": duration,
+                      "guid": f"https://zarazhangrui.github.io/my-podcast-feed/episodes/{mp3.name}",
+                  })
+
+          # Sort newest first, enforce retention
+          episodes.sort(key=lambda e: e["pub_date"], reverse=True)
+          episodes = episodes[:30]
+
+          # Save episodes list
+          with open("episodes.json", "w") as f:
+              json.dump(episodes, f, indent=2)
+
+          # Render feed.xml
+          template_path = os.path.expanduser("~/.claude/skills/personalized-podcast/templates/feed_template.xml")
+          with open(template_path) as f:
+              template = Template(f.read())
+
+          feed_xml = template.render(
+              show_name="AI News for Zara",
+              github_pages_url="https://zarazhangrui.github.io/my-podcast-feed",
+              language="en",
+              episodes=episodes,
+          )
+
+          with open("feed.xml", "w") as f:
+              f.write(feed_xml)
+          print(f"Feed updated with {len(episodes)} episodes")
+          PYEOF
+
+          # Commit and push
+          git config user.name "Podcast Bot"
+          git config user.email "bot@noreply.github.com"
+          git add episodes/ episodes.json feed.xml
+          git commit -m "Add episode: $(date +%Y-%m-%d)" || echo "Nothing to commit"
+          git push
 
       - name: Show logs
         if: always()
