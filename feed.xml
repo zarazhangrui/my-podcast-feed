@@ -49,5 +49,17 @@
       <itunes:summary>Your personalized podcast for March 15, 2026</itunes:summary>
     </item>
     
+    <item>
+      <title>AI News for Zara — March 16, 2026</title>
+      <description>Your personalized podcast for March 16, 2026</description>
+      <pubDate>Mon, 16 Mar 2026 17:05:41 GMT</pubDate>
+      <enclosure url="https://zarazhangrui.github.io/my-podcast-feed/episodes/2026-03-16-170535.mp3"
+                 length="8627139"
+                 type="audio/mpeg"/>
+      <guid isPermaLink="false">https://zarazhangrui.github.io/my-podcast-feed/episodes/2026-03-16-170535.mp3</guid>
+      <itunes:duration>8:59</itunes:duration>
+      <itunes:summary>Your personalized podcast for March 16, 2026</itunes:summary>
+    </item>
+    
   </channel>
 </rss>
