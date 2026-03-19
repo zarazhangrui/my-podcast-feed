@@ -1,6 +1,14 @@
 {
-  "last_run": "2026-03-16T17:05:39.897221+00:00",
+  "last_run": "2026-03-19T15:46:59.654373+00:00",
   "processed_ids": [
+    "https://read.technically.dev/p/how-ai-content-detectors-work",
+    "https://www.bensbites.com/p/what-makes-a-good-agentsmd",
+    "https://www.latent.space/p/ainews-minimax-27-glm-5-at-13-cost",
+    "https://www.latent.space/p/ainews-claude-cowork-dispatch-anthropics",
+    "https://www.latent.space/p/felix-anthropic",
+    "https://www.bensbites.com/p/nvidia-loves-openclaw",
+    "https://www.bensbites.com/p/this-is-a-new-format-id-like-to-try",
+    "https://www.latent.space/p/ainews-nvidia-gtc-jensen-goes-hard",
     "https://www.latent.space/p/ainews-context-drought"
   ]
 }

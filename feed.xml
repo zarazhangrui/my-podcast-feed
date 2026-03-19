@@ -26,6 +26,18 @@
 
     
     <item>
+      <title>AI News for Zara — March 19, 2026</title>
+      <description>Your personalized podcast for March 19, 2026</description>
+      <pubDate>Thu, 19 Mar 2026 15:47:01 GMT</pubDate>
+      <enclosure url="https://zarazhangrui.github.io/my-podcast-feed/episodes/2026-03-19-154656.mp3"
+                 length="7591436"
+                 type="audio/mpeg"/>
+      <guid isPermaLink="false">https://zarazhangrui.github.io/my-podcast-feed/episodes/2026-03-19-154656.mp3</guid>
+      <itunes:duration>7:54</itunes:duration>
+      <itunes:summary>Your personalized podcast for March 19, 2026</itunes:summary>
+    </item>
+    
+    <item>
       <title>My Daily Digest — March 15, 2026</title>
       <description>Your personalized podcast for March 15, 2026</description>
       <pubDate>Sun, 15 Mar 2026 04:25:26 GMT</pubDate>
